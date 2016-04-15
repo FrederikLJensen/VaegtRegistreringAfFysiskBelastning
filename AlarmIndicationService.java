@@ -6,6 +6,7 @@ import android.os.IBinder;
 
 public class AlarmIndicationService extends Service {
     public AlarmIndicationService() {
+
     }
 
     @Override
