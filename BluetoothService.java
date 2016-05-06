@@ -19,9 +19,11 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.util.List;
 import java.util.UUID;
 
 // Adapted from Source: http://developer.android.com/guide/topics/connectivity/bluetooth-le.html 12-04-16
@@ -29,16 +31,30 @@ import java.util.UUID;
 
 public class BluetoothService extends Service {
 
+
 // Tag for the info console.
     private final static String TAG = BluetoothService.class.getSimpleName();
 
+    private static final String WEIGHT_SERVICE = "f00d";
 
+    private static final String FRONT_SENSOR = "beef";
+    private static final String BACK_SENSOR = "ceef";
+    private static final String LEFT_SENSOR = "deef";
+    private static final String RIGHT_SENSOR = "feef";
+
+    private static String nextInRow = "";
+
+    private BluetoothGattService vaegtService = null; // The service with the UUID segment in SERVICE
     private static final long SCAN_TIME = 20000; //In milliseconds
     private Handler mHandler; // the handler that will stop the scan after SCAN_TIME ms
     private BluetoothAdapter mBluetoothAdapter; //Where we start Bluetooth LEscans from.
     private boolean mScanning; // If we are mid-scan or not. //TODO this
     private BluetoothGatt mBluetoothGatt;
     private BluetoothManager bluetoothManager;
+
+    final Handler h = new Handler();
+
+    private boolean gattConnected;
 
     // For broadcasting Intents:
     public final static String ACTION_DATA_AVAILABLE =
@@ -62,6 +78,8 @@ public class BluetoothService extends Service {
 
     @Override
     public void onCreate() {
+
+
         bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
@@ -107,16 +125,17 @@ public class BluetoothService extends Service {
                     Intent intent=new Intent(getApplicationContext(),BluetoothService.class);
                     intent.setAction("com.vaegtregistreringaffysiskbelasting.BroadcastNewDevice");
                     intent.putExtra("device", device);
-                    intent.putExtra("rssi",rssi);
+                    intent.putExtra("rssi", rssi);
                     sendBroadcast(intent);
                     Log.d(TAG, "onLeScan: " + device.getAddress() + " name: " + device.getName());
 
                     // TODO TEMPORARY TEST, should be replaced with a broadcastReceiver to get which device to connect to from User
                     //Connect to Footsensor
                     if(device.getName() != null) {
-                        if (device.getName().equals("Footsensor")) {
-                            mBluetoothGatt = device.connectGatt(BluetoothService.this, false, mGattCallback);
+                        if (device.getName().equals("Footsensor") && !gattConnected) {
+                            gattConnected = true; //TODO
                             mBluetoothAdapter.stopLeScan(mLeScanCallback);
+                            if(!gattConnected) mBluetoothGatt = device.connectGatt(BluetoothService.this, false, mGattCallback);
                             Toast.makeText(getBaseContext(),"BLE scan ended",Toast.LENGTH_SHORT).show();
                             mScanning = false;
                         }
@@ -125,15 +144,17 @@ public class BluetoothService extends Service {
             };
     private final BluetoothGattCallback mGattCallback =
             new BluetoothGattCallback() {
-                @Override
+
                 public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
+                        gattConnected = true;
                         Log.i(TAG, "Connected to the GATT server.");
                         // List the services in the console
                         Log.i(TAG, "Attempting to start service discovery:" +
                                 mBluetoothGatt.discoverServices());
                     }
                     if (newState == BluetoothProfile.STATE_DISCONNECTED){
+                        gattConnected = false;
                         Log.i(TAG, "Disconnected from GATT server.");
                     }
                 }
@@ -142,40 +163,94 @@ public class BluetoothService extends Service {
                 public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         Log.d(TAG, "onServicesDiscovered: " + gatt.getServices().size());
-                        // Loop through the services
+
+                        // Loop through the services, find and save WEIGHT_SERVICE to vaegtService
                         for (BluetoothGattService gattserv : gatt.getServices()) {
-                            Log.d(TAG, "onServicesDiscovered, Service: " + gattserv.getUuid() + "gattCharacteristics length: " + gattserv.getCharacteristics().size());
-                            // Loop through the characteristics
-                            for (BluetoothGattCharacteristic gattCha : gattserv.getCharacteristics()) {
-                                Log.d(TAG, "onServicesDiscovered, Service, Characteristics: " + gattCha.getUuid() + " Desc: " + gattCha.getDescriptor(gattCha.getUuid()));
-                                // If the characteristic contains "beef" (our UUID for it) then read it.
-                                
-                                if(gattCha.getUuid().toString().contains("beef")) {
-                                    //Log.d(TAG, "onServicesDiscovered, Service, Characteristics reading...: " + gatt.readCharacteristic(gattCha));
-                                    mBluetoothGatt.setCharacteristicNotification(gattCha, true);
 
-                                    // Iterate through all the descriptors in the characteristic. We need to set ENABLE_NOTIFICATION_VALUE which is 0x2902:
+                            List<BluetoothGattCharacteristic> gattCharacteristics =
+                                    gattserv.getCharacteristics();
 
-                                    for( BluetoothGattDescriptor descriptor : gattCha.getDescriptors()){
-                                        Log.d(TAG, "onServicesDiscovered: Characteristics, Descriptor: " + descriptor.getUuid());
-                                        // If the descriptor is the place to write ENABLE_NOTIFICATION_VALUE
-                                        if(descriptor.getUuid().toString().contains("2902")){
-                                            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                                            Log.d(TAG, "onServicesDiscovered: Descriptor written: " + mBluetoothGatt.writeDescriptor(descriptor));
+                            Log.d(TAG, "onServicesDiscovered, Service: " + gattserv.getUuid() + " gattCharacteristics length: " + gattCharacteristics.size());
+                            if (gattserv.getUuid().toString().contains(WEIGHT_SERVICE)) {
+                                Log.d(TAG, "onServicesDiscovered: Contains WEIGHT_SERVICES");
+
+                                //Set the vaegtService for reference in the descriptorWrite
+                                vaegtService = gattserv;
+
+                                // Loop through the characteristics of WEIGHT_SERVICE
+                                for (BluetoothGattCharacteristic gattCha : vaegtService.getCharacteristics()) {
+                                    //Log.d(TAG, "onServicesDiscovered, service, FORCE CONNECT deef, descriptor  size: " + vaegtService.getCharacteristic(UUID.fromString("0000deef-1212-efde-1523-785fef13d123")).getDescriptors().size());
+                                    Log.d(TAG, "onServicesDiscovered, Service, Characteristics: " + gattCha.getUuid() + " Desc: " + gattCha.getDescriptor(gattCha.getUuid()));
+
+                                    // If the characteristic contains the FRONT uuid, set the notification.
+                                    if (gattCha.getUuid().toString().contains(FRONT_SENSOR)) {
+                                        nextInRow = BACK_SENSOR; // Set the next UUID to be BACK_SENSOR
+                                        //Log.d(TAG, "onServicesDiscovered, Service, Characteristics reading...: " + gatt.readCharacteristic(gattCha));
+                                        mBluetoothGatt.setCharacteristicNotification(gattCha, true);
+
+                                        // Iterate through all the descriptors in the characteristic. We need to set ENABLE_NOTIFICATION_VALUE which is 0x2902:
+                                        for (BluetoothGattDescriptor descriptor : gattCha.getDescriptors()) {
+                                            Log.d(TAG, "onServicesDiscovered: Characteristics, Descriptor: " + descriptor.getUuid());
+                                            // If the descriptor is the place to write ENABLE_NOTIFICATION_VALUE
+                                            if (descriptor.getUuid().toString().contains("2902")) {
+                                                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                                                Log.d(TAG, "onServicesDiscovered: Descriptor written: " + mBluetoothGatt.writeDescriptor(descriptor));
+                                            }
                                         }
                                     }
-
-
-
                                 }
+
                             }
-                        } 
-                        
-
-
+                        }
                     }
                     else Log.d(TAG, "onServicesDiscovered: " + status);
+                }
+                @Override
+                public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status){
 
+                    Log.d(TAG, "onDescriptorWrite triggered! this time: " +nextInRow);
+                        // If the characteristic contains the FRONT uuid, set the notification.
+                    if(nextInRow.length() != 0) {
+                        for (BluetoothGattCharacteristic gattCha : vaegtService.getCharacteristics()) {
+                            if (gattCha.getUuid().toString().contains(nextInRow)) { // If nextInRow contains a string and the characteristic matches it.
+                                mBluetoothGatt.setCharacteristicNotification(gattCha, true); // Enable "we want to get notifications" locally.
+                                // Set the next sensor to setup
+                                switch (nextInRow) {
+                                    case BACK_SENSOR:
+                                        nextInRow = LEFT_SENSOR;
+
+                                        break;
+                                    case LEFT_SENSOR:
+                                        nextInRow = RIGHT_SENSOR;
+                                        break;
+                                    case RIGHT_SENSOR:
+                                            nextInRow = "";
+                                        break;
+                                }
+                                Log.d(TAG, "onDescriptorWrite: next in row: " + nextInRow);
+                                    // Iterate through all the descriptors in the characteristic. We need to set ENABLE_NOTIFICATION_VALUE which is 0x2902:
+                                    for (BluetoothGattDescriptor descriptorTemp : gattCha.getDescriptors()) {
+                                        Log.d(TAG, "onDescriptorWrite: Characteristics, Descriptor: " + descriptorTemp.getUuid());
+                                        // If the descriptor is the place to write ENABLE_NOTIFICATION_VALUE
+                                        if (descriptorTemp.getUuid().toString().contains("2902")) {
+                                            descriptorTemp.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+
+                                            final BluetoothGattDescriptor d = descriptorTemp;
+
+                                            h.postDelayed(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    if (mScanning != false) {
+                                                        Log.d(TAG, "onDescriptorWrite: Descriptor written: " + mBluetoothGatt.writeDescriptor(d));
+                                                    }
+                                                }
+                                            }, 100);
+
+                                        }
+                                    }
+                            }
+                        }
+                    }
                 }
 
                 @Override
@@ -192,7 +267,7 @@ public class BluetoothService extends Service {
                 // When notfied of change
                 @Override
                 public void onCharacteristicChanged (BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
-                    Log.d(TAG, "onCharacteristicChanged(beef): " + characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0));
+                    Log.d(TAG, "onCharacteristicChanged(" + characteristic.getUuid() +"): " + characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0));
                 }
 
             };
