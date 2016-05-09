@@ -54,7 +54,7 @@ public class BluetoothService extends Service {
 
     final Handler h = new Handler();
 
-    private boolean gattConnected;
+    private static boolean gattConnected;
 
     // For broadcasting Intents:
     public final static String ACTION_DATA_AVAILABLE =
@@ -71,10 +71,6 @@ public class BluetoothService extends Service {
     };
 
     // Initializes Bluetooth manager.
-
-    // Constructer, not sure if we need it.
-     public BluetoothService() {
-    }
 
     @Override
     public void onCreate() {

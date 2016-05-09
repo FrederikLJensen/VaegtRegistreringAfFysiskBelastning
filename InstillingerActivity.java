@@ -39,6 +39,7 @@ public class InstillingerActivity extends AppCompatActivity {
     private ArrayAdapter<String> adapter;
     private ArrayList<String> bluetoothDevices;
     private TextView t;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,7 +49,15 @@ public class InstillingerActivity extends AppCompatActivity {
 
         sharedPref = getSharedPreferences("vaegtRegistreringPrefs", Context.MODE_PRIVATE);
 
-
+// Setup the button
+        Button button = (Button) findViewById(R.id.buttonBack);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(getBaseContext(), MainActivity.class);
+                startActivity(intent);
+            }
+        });
 
         t = (TextView) findViewById(R.id.textViewWeight); // get the textview to adjust our weight threshold
         //t.setClickable(true);
@@ -74,27 +83,29 @@ public class InstillingerActivity extends AppCompatActivity {
         handleSwitches();
         // Enable bluetooth button
         handleBluetoothButton();
+
         // Register receiver for getting updates on bluetooth devices
-        IntentFilter filter = new IntentFilter("com.vaegtregistreringaffysiskbelasting.BroadcastNewDevice");
+        /*IntentFilter filter = new IntentFilter("com.vaegtregistreringaffysiskbelasting.BroadcastNewDevice");
         this.registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 addBTItems(intent.getExtras().getString("device"));
             }
         }, filter);
+        */
 
         // The visible list containing the found bluetooth devices
-        mBluetoothList = (ListView)findViewById(R.id.listView);
+       /* mBluetoothList = (ListView)findViewById(R.id.listView);
         //Initialize bluetooth list
         bluetoothDevices = new ArrayList<String>();
         // Attach adapter to list
         adapter=new ArrayAdapter<String>(this,
                 android.R.layout.simple_list_item_1,
                 bluetoothDevices);
-        mBluetoothList.setAdapter(adapter);
+        mBluetoothList.setAdapter(adapter);*/
 
         // When an item is selected
-        mBluetoothList.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+/*        mBluetoothList.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
                 Toast.makeText(getBaseContext(), "int i = " + i + ", long l = " + l, Toast.LENGTH_LONG).show();
@@ -104,7 +115,7 @@ public class InstillingerActivity extends AppCompatActivity {
             public void onNothingSelected(AdapterView<?> adapterView) {
 
             }
-        });
+        });*/
 
 
     }
@@ -190,8 +201,8 @@ public class InstillingerActivity extends AppCompatActivity {
     }
 
     // Method to add items to the list and update the view
-    public void addBTItems(String item) {
+  /*  public void addBTItems(String item) {
         bluetoothDevices.add(item);
         adapter.notifyDataSetChanged();
-    }
+    }*/
 }

@@ -12,40 +12,45 @@ import android.net.Uri;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.Vibrator;
+import android.util.Log;
 
 public class AlarmIndicationService extends Service {
 
     //TODO test this.
-    private final SharedPreferences sharedPref = getSharedPreferences("vaegtRegistreringPrefs", Context.MODE_PRIVATE);
+    private SharedPreferences sharedPref;
+
+    private final static String TAG = BluetoothService.class.getSimpleName();//Tag for logd
+
+    private BroadcastReceiver vaegtReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            int threshold = sharedPref.getInt("vaegt",0);
+
+            if(intent.getIntArrayExtra("Data") != null){
+
+                int total = 0;
+                for(int i : intent.getIntArrayExtra("Data")){
+                    total+=i;
+                }
+                if(total >= threshold){
+                    alarm();
+                }
+
+            }
+
+        }
+    };
 
     //Broadcast receiver for BT data
     @Override
     public void onCreate() {
 
+        sharedPref = getSharedPreferences("vaegtRegistreringPrefs", Context.MODE_PRIVATE);
         //int threshold = 50;
 
         IntentFilter filter = new IntentFilter("com.vaegtregistreringaffysiskbelasting.BroadcastBTData");
-        this.registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-
-
-                int threshold = sharedPref.getInt("vaegt",0);
-
-                if(intent.getIntArrayExtra("Data") != null){
-
-                    int total = 0;
-                  for(int i : intent.getIntArrayExtra("Data")){
-                      total+=i;
-                  }
-                    if(total >= threshold){
-                        alarm();
-                    }
-
-                }
-
-            }
-        }, filter);
+        this.registerReceiver(vaegtReceiver, filter);
     }
 
     private void alarm(){
@@ -104,5 +109,10 @@ public class AlarmIndicationService extends Service {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
-
+    @Override
+    public void onDestroy() {
+        Log.d(TAG, "Alarm indication Service Destroyed!");
+        unregisterReceiver(vaegtReceiver);
+        super.onDestroy();
+    }
 }
