@@ -19,7 +19,7 @@ public class AlarmIndicationService extends Service {
     //TODO test this.
     private SharedPreferences sharedPref;
 
-    private final static String TAG = BluetoothService.class.getSimpleName();//Tag for logd
+    private final static String TAG = BluetoothService.class.getSimpleName();//Tag for logging
 
     private BroadcastReceiver vaegtReceiver = new BroadcastReceiver() {
         @Override

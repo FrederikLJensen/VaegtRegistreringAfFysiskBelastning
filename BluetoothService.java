@@ -48,9 +48,12 @@ public class BluetoothService extends Service {
     private static final long SCAN_TIME = 20000; //In milliseconds
     private Handler mHandler; // the handler that will stop the scan after SCAN_TIME ms
     private BluetoothAdapter mBluetoothAdapter; //Where we start Bluetooth LEscans from.
-    private boolean mScanning; // If we are mid-scan or not. //TODO this
+    private boolean mScanning; // If we are mid-scan or not.
     private BluetoothGatt mBluetoothGatt;
     private BluetoothManager bluetoothManager;
+
+    // Used for the broadcasts
+    private int[] recentSensorValues = new int[5];
 
     final Handler h = new Handler();
 
@@ -74,7 +77,6 @@ public class BluetoothService extends Service {
 
     @Override
     public void onCreate() {
-
 
         bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -125,7 +127,6 @@ public class BluetoothService extends Service {
                     sendBroadcast(intent);
                     Log.d(TAG, "onLeScan: " + device.getAddress() + " name: " + device.getName());
 
-                    // TODO TEMPORARY TEST, should be replaced with a broadcastReceiver to get which device to connect to from User
                     //Connect to Footsensor
                     if(device.getName() != null) {
                         if (device.getName().equals("Footsensor") && !gattConnected) {
@@ -277,10 +278,27 @@ public class BluetoothService extends Service {
         if(data != null && data.length > 0) {// basically, if there's data at all
             Log.d(TAG, "broadcastUpdate: " + data);
 
-            intent.putExtra(EXTRA_DATA, new String(data) + "\n"/* +
-                    stringBuilder.toString()*/); //TODO more formatting here.
+            String characteristicUUID = characteristic.getUuid().toString();
+
+            try {
+                if (characteristicUUID.contains(FRONT_SENSOR)) {
+                    recentSensorValues[1] = Integer.parseInt(data.toString());
+                }
+                if (characteristicUUID.contains(RIGHT_SENSOR)) {
+                    recentSensorValues[2] = Integer.parseInt(data.toString());
+                }
+                if (characteristicUUID.contains(BACK_SENSOR)) {
+                    recentSensorValues[3] = Integer.parseInt(data.toString());
+                }
+                if (characteristicUUID.contains(LEFT_SENSOR)) {
+                    recentSensorValues[4] = Integer.parseInt(data.toString());
+                }
+            }catch (Exception e){
+                Log.e(TAG, "broadcastUpdate ERROR: Failed to cast data to int");
+            }
+            intent.putExtra(EXTRA_DATA, recentSensorValues);
+            sendBroadcast(intent);
         } else Log.d(TAG, "broadcastUpdate: " + "No data");
-        sendBroadcast(intent); // TODO, should we broadcast null and length 0 data? If not, move into IF statement
     }
 
     @Override
