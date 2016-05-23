@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.hardware.Camera;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -21,16 +23,21 @@ public class AlarmIndicationService extends Service {
 
     private final static String TAG = BluetoothService.class.getSimpleName();//Tag for logging
 
+    public final static String ACTION_DATA_AVAILABLE =
+            "com.vaegtregistreringaffysiskbelastning.bluetooth.le.ACTION_DATA_AVAILABLE";
+    // Extra data for the bluetooth broadcast
+    public final static String EXTRA_DATA = "com.vaegtregistreringaffysiskbelastning.bluetooth.le.EXTRA_DATA";
+
     private BroadcastReceiver vaegtReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
 
             int threshold = sharedPref.getInt("vaegt",0);
 
-            if(intent.getIntArrayExtra("Data") != null){
+            if(intent.getIntArrayExtra(EXTRA_DATA) != null){
 
                 int total = 0;
-                for(int i : intent.getIntArrayExtra("Data")){
+                for(int i : intent.getIntArrayExtra(EXTRA_DATA)){
                     total+=i;
                 }
                 if(total >= threshold){
@@ -49,12 +56,17 @@ public class AlarmIndicationService extends Service {
         sharedPref = getSharedPreferences("vaegtRegistreringPrefs", Context.MODE_PRIVATE);
         //int threshold = 50;
 
-        IntentFilter filter = new IntentFilter("com.vaegtregistreringaffysiskbelasting.BroadcastBTData");
+        IntentFilter filter = new IntentFilter(ACTION_DATA_AVAILABLE);
         this.registerReceiver(vaegtReceiver, filter);
     }
 
     private void alarm(){
         // If the alarm is enabled
+
+        // Send alarm broadcast. For changing colours in the MainActivity, possibly light alarm.
+        Intent intent = new Intent("alarm");
+        sendBroadcast(intent);
+
         if(sharedPref.getBoolean("switchAlarm",true)) {
             //Vibrate
             if (sharedPref.getBoolean("switchVibration", true)) {
@@ -66,31 +78,37 @@ public class AlarmIndicationService extends Service {
             if (sharedPref.getBoolean("switchLight", true)) {
 
                 //Source: http://stackoverflow.com/questions/14436103/how-to-make-screen-flashing-blinking-from-background-service-on-android-device 27/04-16
+                //Source2: http://stackoverflow.com/questions/6068803/how-to-turn-on-camera-flash-light-programmatically-in-android
+                //
 
                 //TODO test lights
                 PowerManager powerMan = (PowerManager) getSystemService(Context.POWER_SERVICE);
                 final PowerManager.WakeLock wakeLock = powerMan.newWakeLock(
                         PowerManager.SCREEN_DIM_WAKE_LOCK |
                                 PowerManager.ACQUIRE_CAUSES_WAKEUP, "wakelockTag");
-
-                new Thread() {
-                    public void run() {
-                        boolean screenOn = false;
-                        for (int i = 0; i < 5; i++) {
-                            try {
-                                sleep(500);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            if (screenOn) {
-                                wakeLock.acquire();
-                            } else {
-                                wakeLock.release();
+                wakeLock.acquire();
+                wakeLock.release();
+                if(getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
+                    new Thread() {
+                        public void run() {
+                            boolean screenOn = false;
+                            for (int i = 0; i < 3; i++) {
+                                Camera cam = Camera.open();
+                                Camera.Parameters p = cam.getParameters();
+                                p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+                                cam.setParameters(p);
+                                cam.startPreview();
+                                try {
+                                    sleep(500);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                                cam.stopPreview();
+                                cam.release();
                             }
                         }
-                    }
-                }.run();
-
+                    }.run();
+                }
             }
             //Sound
             if (sharedPref.getBoolean("switchSound", true)) {
@@ -105,7 +123,6 @@ public class AlarmIndicationService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
         throw new UnsupportedOperationException("Not yet implemented");
     }
 

@@ -42,6 +42,9 @@ public class BluetoothService extends Service {
     private static final String LEFT_SENSOR = "deef";
     private static final String RIGHT_SENSOR = "feef";
 
+    // BLE-button broadcast
+    private final static String BLE_BROADCAST = "com.vaegtregistreringaffysiskbelasting.BLEScan";
+
     private static String nextInRow = "";
 
     private BluetoothGattService vaegtService = null; // The service with the UUID segment in SERVICE
@@ -69,7 +72,8 @@ public class BluetoothService extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "BluetoothLEScanRequest Received: " + intent.toString());
-            //scanLeDevice();
+
+            scanLeDevice();
         }
     };
 
@@ -82,7 +86,7 @@ public class BluetoothService extends Service {
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
         // Register receiver for getting updates on bluetooth devices
-        IntentFilter filter = new IntentFilter("com.vaegtregistreringaffysiskbelasting.BLEScan");
+        IntentFilter filter = new IntentFilter(BLE_BROADCAST);
         this.registerReceiver(BLEScanReceiver, filter);
         scanLeDevice();
     }

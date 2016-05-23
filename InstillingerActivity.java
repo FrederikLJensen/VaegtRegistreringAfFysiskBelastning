@@ -33,6 +33,8 @@ import bachelor.vaegtregistreringaffysiskbelastning.R;
 public class InstillingerActivity extends AppCompatActivity {
 
     private final static String TAG = InstillingerActivity.class.getSimpleName();
+    // BLE-button broadcast
+    private final static String BLE_BROADCAST = "com.vaegtregistreringaffysiskbelasting.BLEScan";
     private SharedPreferences sharedPref;
 
     private ListView mBluetoothList;
@@ -156,7 +158,7 @@ public class InstillingerActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 Intent intent=new Intent(getApplicationContext(),InstillingerActivity.class);
-                intent.setAction("com.vaegtregistreringaffysiskbelasting.BLEScan");
+                intent.setAction(BLE_BROADCAST);
                 sendBroadcast(intent);
                 Log.d(TAG, "Bluetooth/ScanButtonClick");
             }

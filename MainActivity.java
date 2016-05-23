@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,15 +21,22 @@ import bachelor.vaegtregistreringaffysiskbelastning.R;
 
 public class MainActivity extends ActionBarActivity {
 
+    // This is the broadcast from BluetoothService.
+    public final static String ACTION_DATA_AVAILABLE =
+            "com.vaegtregistreringaffysiskbelastning.bluetooth.le.ACTION_DATA_AVAILABLE";
+    // This is the integer array in the broadcast from BluetoothService.
+    public final static String EXTRA_DATA = "com.vaegtregistreringaffysiskbelastning.bluetooth.le.EXTRA_DATA";
+
+
     private BroadcastReceiver vaegtReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
 
-            if(intent.getIntArrayExtra("Data") != null){
+            if(intent.getIntArrayExtra(EXTRA_DATA) != null){
 
                 int total = 0;
                 int counter = 0;
-                for (int i : intent.getIntArrayExtra("Data")) {
+                for (int i : intent.getIntArrayExtra(EXTRA_DATA)) {
 
                     total+=i;
                     updateText(i, counter);
@@ -47,7 +55,6 @@ public class MainActivity extends ActionBarActivity {
         resetText();
         // start bluetooth service
         startService(new Intent(this, BluetoothService.class));
-        //TODO: test:
         // Start AlarmIndicationService
         startService(new Intent(this, AlarmIndicationService.class));
 
@@ -59,6 +66,9 @@ public class MainActivity extends ActionBarActivity {
                 startActivity(intent);
             }
         });
+
+        IntentFilter filter = new IntentFilter(ACTION_DATA_AVAILABLE);
+        this.registerReceiver(vaegtReceiver, filter);
     }
 
     @Override
@@ -77,7 +87,6 @@ public class MainActivity extends ActionBarActivity {
     }
 
     private void updateText(int value, int sensor){
-//TODO: set text of textviews. Ensure correct order.
 
         TextView backSensor = (TextView) findViewById(R.id.textViewBackSensor);
         TextView frontSensor =(TextView) findViewById(R.id.textViewFrontSensor);
@@ -119,8 +128,6 @@ public class MainActivity extends ActionBarActivity {
         }catch (NumberFormatException nfe){
             Log.e("MainActivity", "updateText ERROR caught: NUMBER FORMAT EXCEPTION. CENTER TEXT NOT UPDATED!");
         }
-
-
     }
 
     @Override
