@@ -45,7 +45,7 @@ public class BluetoothService extends Service {
     // BLE-button broadcast
     private final static String BLE_BROADCAST = "com.vaegtregistreringaffysiskbelasting.BLEScan";
 
-    private static String nextInRow = "";
+    private static String nextInRow = FRONT_SENSOR;
 
     private BluetoothGattService vaegtService = null; // The service with the UUID segment in SERVICE
     private static final long SCAN_TIME = 20000; //In milliseconds
@@ -96,15 +96,15 @@ public class BluetoothService extends Service {
         // the use of this method over the
         // API 21 startScan(List,ScanSettings,ScanCallback)
         // is deliberate. api 21 is still new, and most phones won't run it.
-        mHandler = new Handler();
+       // mHandler = new Handler();
 
     if(!mScanning) {
         mBluetoothAdapter.startLeScan(mLeScanCallback);
         mScanning = true;
         Log.d(TAG, "scanningLeDevice: ");
-        Toast.makeText(getBaseContext(),"BLE scanning...",Toast.LENGTH_SHORT).show();
+//        Toast.makeText(getBaseContext(),"BLE scanning...",Toast.LENGTH_SHORT).show();
     }
-        mHandler.postDelayed(new Runnable() {
+        /*mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if(mScanning!= false) {
@@ -113,7 +113,7 @@ public class BluetoothService extends Service {
                     Toast.makeText(getBaseContext(), "BLE scan ended", Toast.LENGTH_SHORT).show();
                 }
             }
-        }, SCAN_TIME);
+        }, SCAN_TIME);*/
     }
 
     // The handler where the found objects are called back to.
@@ -134,9 +134,9 @@ public class BluetoothService extends Service {
                     //Connect to Footsensor
                     if(device.getName() != null) {
                         if (device.getName().equals("Footsensor") && !gattConnected) {
-                            gattConnected = true; //TODO
+                            gattConnected = true;
                             mBluetoothAdapter.stopLeScan(mLeScanCallback);
-                            if(!gattConnected) mBluetoothGatt = device.connectGatt(BluetoothService.this, false, mGattCallback);
+                            mBluetoothGatt = device.connectGatt(BluetoothService.this, true, mGattCallback);
                             Toast.makeText(getBaseContext(),"BLE scan ended",Toast.LENGTH_SHORT).show();
                             mScanning = false;
                         }
@@ -157,6 +157,7 @@ public class BluetoothService extends Service {
                     if (newState == BluetoothProfile.STATE_DISCONNECTED){
                         gattConnected = false;
                         Log.i(TAG, "Disconnected from GATT server.");
+                        scanLeDevice();
                     }
                 }
                 @Override
@@ -184,8 +185,9 @@ public class BluetoothService extends Service {
                                     Log.d(TAG, "onServicesDiscovered, Service, Characteristics: " + gattCha.getUuid() + " Desc: " + gattCha.getDescriptor(gattCha.getUuid()));
 
                                     // If the characteristic contains the FRONT uuid, set the notification.
-                                    if (gattCha.getUuid().toString().contains(FRONT_SENSOR)) {
-                                        nextInRow = BACK_SENSOR; // Set the next UUID to be BACK_SENSOR
+                                    Log.d(TAG, "onServicesDiscovered, nextInRow = " + nextInRow);
+                                    if (gattCha.getUuid().toString().contains(nextInRow) && !nextInRow.equals("STOP") && !nextInRow.equals("")) {
+
                                         //Log.d(TAG, "onServicesDiscovered, Service, Characteristics reading...: " + gatt.readCharacteristic(gattCha));
                                         mBluetoothGatt.setCharacteristicNotification(gattCha, true);
 
@@ -209,9 +211,19 @@ public class BluetoothService extends Service {
                 @Override
                 public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status){
 
-                    Log.d(TAG, "onDescriptorWrite triggered! this time: " +nextInRow);
+                    Log.d(TAG, "(OnServiceDiscovered)onDescriptorWrite triggered! nextInRow: " +nextInRow);
+
+
+                    if(nextInRow.contains(LEFT_SENSOR)) nextInRow = "stop";
+                    if(nextInRow.contains(BACK_SENSOR)) nextInRow = LEFT_SENSOR;
+                    if(nextInRow.contains(RIGHT_SENSOR)) nextInRow = BACK_SENSOR;
+                    if(nextInRow.contains(FRONT_SENSOR)) nextInRow = RIGHT_SENSOR;
+
                         // If the characteristic contains the FRONT uuid, set the notification.
-                    if(nextInRow.length() != 0) {
+                    if(!nextInRow.equals("stop"))
+                    mBluetoothGatt.discoverServices();
+
+                   /* if(nextInRow.length() != 0) {
                         for (BluetoothGattCharacteristic gattCha : vaegtService.getCharacteristics()) {
                             if (gattCha.getUuid().toString().contains(nextInRow)) { // If nextInRow contains a string and the characteristic matches it.
                                 mBluetoothGatt.setCharacteristicNotification(gattCha, true); // Enable "we want to get notifications" locally.
@@ -219,7 +231,6 @@ public class BluetoothService extends Service {
                                 switch (nextInRow) {
                                     case BACK_SENSOR:
                                         nextInRow = LEFT_SENSOR;
-
                                         break;
                                     case LEFT_SENSOR:
                                         nextInRow = RIGHT_SENSOR;
@@ -251,7 +262,7 @@ public class BluetoothService extends Service {
                                     }
                             }
                         }
-                    }
+                    }*/
                 }
 
                 @Override
@@ -260,53 +271,54 @@ public class BluetoothService extends Service {
                                                  BluetoothGattCharacteristic characteristic,
                                                  int status) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
-                        broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
-                        Log.d(TAG, "onServicesDiscovered, Service," + characteristic.getUuid() + " Val: " + characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_SINT32,0) );
+                        broadcastUpdate(characteristic);
+                        Log.d(TAG, "onServicesDiscovered, Service," + characteristic.getUuid() + " Val: " + characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0) );
                     }
                 }
 
                 // When notfied of change
                 @Override
                 public void onCharacteristicChanged (BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
-                    Log.d(TAG, "onCharacteristicChanged(" + characteristic.getUuid() +"): " + characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0));
+                    Log.d(TAG, "onCharacteristicChanged(" + characteristic.getUuid() +"): " + characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0));
+                    broadcastUpdate(characteristic);
                 }
 
             };
 
     // Broadcasts an update over the Intent API. This is for detection by activities and other services.
-    private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
-        final Intent intent = new Intent(action);
+    private void broadcastUpdate(final BluetoothGattCharacteristic characteristic) {
+        final Intent intent = new Intent(ACTION_DATA_AVAILABLE);
 
         // Reads the value of the characteristic and formats it
-        byte[] data = characteristic.getValue();
-        if(data != null && data.length > 0) {// basically, if there's data at all
-            Log.d(TAG, "broadcastUpdate: " + data);
+        int data = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0);
+        // basically, if there's data at all
+            Log.d(TAG, "broadcastUpdate: " + data + " from: " + characteristic.getUuid().toString());
 
             String characteristicUUID = characteristic.getUuid().toString();
 
             try {
                 if (characteristicUUID.contains(FRONT_SENSOR)) {
-                    recentSensorValues[1] = Integer.parseInt(data.toString());
+                    recentSensorValues[1] = data;
                 }
                 if (characteristicUUID.contains(RIGHT_SENSOR)) {
-                    recentSensorValues[2] = Integer.parseInt(data.toString());
+                    recentSensorValues[2] = data;
                 }
                 if (characteristicUUID.contains(BACK_SENSOR)) {
-                    recentSensorValues[3] = Integer.parseInt(data.toString());
+                    recentSensorValues[3] = data;
                 }
                 if (characteristicUUID.contains(LEFT_SENSOR)) {
-                    recentSensorValues[4] = Integer.parseInt(data.toString());
+                    recentSensorValues[4] = data;
                 }
             }catch (Exception e){
-                Log.e(TAG, "broadcastUpdate ERROR: Failed to cast data to int");
+                Log.e(TAG, "broadcastUpdate ERROR: Failed to cast data to int" + e.toString());
             }
             intent.putExtra(EXTRA_DATA, recentSensorValues);
             sendBroadcast(intent);
-        } else Log.d(TAG, "broadcastUpdate: " + "No data");
     }
 
     @Override
     public void onDestroy(){
+        mBluetoothGatt.disconnect();
         Log.d(TAG, "Bluetooth Service Destroyed!");
         unregisterReceiver(BLEScanReceiver);
         super.onDestroy();

@@ -18,7 +18,6 @@ import android.util.Log;
 
 public class AlarmIndicationService extends Service {
 
-    //TODO test this.
     private SharedPreferences sharedPref;
 
     private final static String TAG = BluetoothService.class.getSimpleName();//Tag for logging
@@ -32,7 +31,7 @@ public class AlarmIndicationService extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
 
-            int threshold = sharedPref.getInt("vaegt",0);
+            int threshold = sharedPref.getInt("vaegt",999999);
 
             if(intent.getIntArrayExtra(EXTRA_DATA) != null){
 
@@ -61,6 +60,9 @@ public class AlarmIndicationService extends Service {
     }
 
     private void alarm(){
+
+        //Seperate thread not to block up the code.
+
         // If the alarm is enabled
 
         // Send alarm broadcast. For changing colours in the MainActivity, possibly light alarm.
@@ -70,9 +72,9 @@ public class AlarmIndicationService extends Service {
         if(sharedPref.getBoolean("switchAlarm",true)) {
             //Vibrate
             if (sharedPref.getBoolean("switchVibration", true)) {
-                Vibrator v = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
-                // Vibrate for 500 milliseconds
-                v.vibrate(200);
+                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                // Vibrate for 100 milliseconds
+                v.vibrate(100);
             }
             //Light
             if (sharedPref.getBoolean("switchLight", true)) {
@@ -81,7 +83,6 @@ public class AlarmIndicationService extends Service {
                 //Source2: http://stackoverflow.com/questions/6068803/how-to-turn-on-camera-flash-light-programmatically-in-android
                 //
 
-                //TODO test lights
                 PowerManager powerMan = (PowerManager) getSystemService(Context.POWER_SERVICE);
                 final PowerManager.WakeLock wakeLock = powerMan.newWakeLock(
                         PowerManager.SCREEN_DIM_WAKE_LOCK |
@@ -89,30 +90,28 @@ public class AlarmIndicationService extends Service {
                 wakeLock.acquire();
                 wakeLock.release();
                 if(getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
-                    new Thread() {
-                        public void run() {
-                            boolean screenOn = false;
-                            for (int i = 0; i < 3; i++) {
+//                    new Thread() {
+//                        public void run() {
+                            for (int i = 0; i < 1; i++) {
                                 Camera cam = Camera.open();
                                 Camera.Parameters p = cam.getParameters();
                                 p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
                                 cam.setParameters(p);
                                 cam.startPreview();
-                                try {
-                                    sleep(500);
+  /*                              try {
+                                    sleep(100);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
-                                }
+    */                           // }
                                 cam.stopPreview();
                                 cam.release();
                             }
-                        }
-                    }.run();
+      //                  }
+      //              }.run();
                 }
             }
             //Sound
             if (sharedPref.getBoolean("switchSound", true)) {
-                //TODO test the sound
                 Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                 Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
                 r.play();
